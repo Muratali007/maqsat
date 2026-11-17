@@ -5,7 +5,8 @@ import { Submit } from "@/components/ui";
 import { TaskList } from "@/components/TaskList";
 import { childHorizon, fmtDate, horizon, sphere, weekStart } from "@/lib/constants";
 import { getSession, nameOf } from "@/lib/session";
-import { progress, type Goal, type Task } from "@/lib/types";
+import { canEdit as canEditGoal, childGoals, getGoal, listGoals, tasksForGoal } from "@/lib/data";
+import { progress } from "@/lib/types";
 import { addTask, setProgress } from "../../actions";
 import { GoalForm } from "../GoalForm";
 import { Breakdown } from "./Breakdown";
@@ -18,22 +19,18 @@ const VIS = { private: "🔒 Только я", shared: "👀 Видна семь
 export default async function GoalPage(props: PageProps<"/goals/[id]">) {
   const { id } = await props.params;
   const { edit } = await props.searchParams;
-  const { supabase, user, family, members } = await getSession();
-  const { data } = await supabase.from("goals").select("*").eq("id", id).maybeSingle();
-  if (!data) notFound();
-  const g = data as Goal;
-  const [kidsRes, parentRes, tasksRes, parentsRes] = await Promise.all([
-    supabase.from("goals").select("*").eq("parent_id", id).neq("status", "dropped").order("deadline"),
-    g.parent_id ? supabase.from("goals").select("id, title").eq("id", g.parent_id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from("tasks").select("*").eq("goal_id", id).order("week_start", { ascending: false }),
-    supabase.from("goals").select("id, title, horizon").eq("status", "active").neq("horizon", "90d"),
+  const { user, family, members, ctx } = await getSession();
+  const g = await getGoal(ctx, id);
+  if (!g) notFound();
+  const [kids, parent, tasks, parents] = await Promise.all([
+    childGoals(ctx, id),
+    g.parent_id ? getGoal(ctx, g.parent_id) : Promise.resolve(null),
+    tasksForGoal(ctx, id),
+    listGoals(ctx, { status: "active", horizonNot: "90d" }),
   ]);
-  const kids = (kidsRes.data ?? []) as Goal[];
-  const parent = parentRes.data as { id: string; title: string } | null;
-  const tasks = (tasksRes.data ?? []) as Task[];
   const s = sphere(g.sphere);
   const p = progress(g);
-  const canEdit = g.owner_id === user.id || g.visibility === "family";
+  const canEdit = canEditGoal(ctx, g);
   const child = childHorizon(g.horizon);
   const thisWeek = weekStart();
 
@@ -109,7 +106,7 @@ export default async function GoalPage(props: PageProps<"/goals/[id]">) {
         edit ? (
           <div className="card space-y-3">
             <div className="flex items-baseline justify-between"><h2 className="h2">Изменить цель</h2><Link href={`/goals/${g.id}`} className="text-sm text-muted">закрыть</Link></div>
-            <GoalForm goal={g} parents={(parentsRes.data ?? []) as Goal[]} members={members} hasFamily={!!family} />
+            <GoalForm goal={g} parents={parents} members={members} hasFamily={!!family} lockVisibility={g.visibility === "family" || g.owner_id !== user.id} />
           </div>
         ) : <Link href={`/goals/${g.id}?edit=1`} className="btn-ghost">✏️ Изменить</Link>
       )}

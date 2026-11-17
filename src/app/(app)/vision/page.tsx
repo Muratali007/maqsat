@@ -1,21 +1,14 @@
 import Link from "next/link";
 import { FAMILY_VISION_QUESTIONS, VISION_QUESTIONS } from "@/lib/constants";
 import { getSession } from "@/lib/session";
+import { getVision } from "@/lib/data";
 import { VisionForm } from "./VisionForm";
 
 export default async function VisionPage(props: PageProps<"/vision">) {
   const { tab } = await props.searchParams;
   const isFamily = tab === "family";
-  const { supabase, user, family } = await getSession();
-
-  let answers: Record<string, string> = {};
-  if (isFamily && family) {
-    const { data } = await supabase.from("visions").select("answers").eq("family_id", family.id).maybeSingle();
-    answers = (data?.answers ?? {}) as Record<string, string>;
-  } else if (!isFamily) {
-    const { data } = await supabase.from("visions").select("answers").eq("owner_id", user.id).is("family_id", null).maybeSingle();
-    answers = (data?.answers ?? {}) as Record<string, string>;
-  }
+  const { family, ctx } = await getSession();
+  const answers = await getVision(ctx, isFamily ? "family" : "personal");
 
   return (
     <div className="max-w-2xl space-y-5">

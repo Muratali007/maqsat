@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Типы и линтер
+        run: npx next typegen && npx tsc --noEmit && npx eslint src test
+      - name: Тесты на встроенном Postgres (PGlite)
+        run: npm test
+      - name: Тесты на Postgres 16
+        run: npm test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      - name: Сборка
+        run: npm run build
+
+  deploy:
+    # После зелёных тестов на main — деплой на Render через Deploy Hook
+    # (секрет RENDER_DEPLOY_HOOK: Render → сервис → Settings → Deploy Hook).
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Render
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then echo "RENDER_DEPLOY_HOOK не задан — пропускаю"; exit 0; fi
+          curl -fsS -X POST "$HOOK" > /dev/null && echo "Деплой запущен"

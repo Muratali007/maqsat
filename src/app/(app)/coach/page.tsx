@@ -1,5 +1,6 @@
 import { AI_ENABLED } from "@/lib/flags";
 import { getSession } from "@/lib/session";
+import { chatHistory } from "@/lib/data";
 import { Chat } from "./Chat";
 
 const FEATURES = [
@@ -12,7 +13,7 @@ const FEATURES = [
 ];
 
 export default async function CoachPage() {
-  const { supabase, user } = await getSession();
+  const { ctx } = await getSession();
   if (!AI_ENABLED) {
     return (
       <div className="max-w-3xl space-y-6">
@@ -33,9 +34,7 @@ export default async function CoachPage() {
       </div>
     );
   }
-  const { data } = await supabase.from("chat_messages").select("role, content").eq("user_id", user.id)
-    .order("created_at", { ascending: false }).limit(60);
-  const initial = ((data ?? []) as { role: "user" | "assistant"; content: string }[]).reverse();
+  const initial = await chatHistory(ctx, 60);
   return (
     <div className="space-y-3">
       <div>

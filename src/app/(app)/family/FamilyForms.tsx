@@ -2,26 +2,26 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { createFamily, joinFamily, updateName } from "../actions";
-import { Notice, Submit } from "@/components/ui";
+import { Notice, Submit, keepValues } from "@/components/ui";
 import { horizon, sphere } from "@/lib/constants";
 
 export function CreateJoin() {
-  const [cState, cAction] = useActionState(createFamily, undefined);
-  const [jState, jAction] = useActionState(joinFamily, undefined);
+  const [cState, cAction, cBusy] = useActionState(createFamily, undefined);
+  const [jState, jAction, jBusy] = useActionState(joinFamily, undefined);
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <form action={cAction} className="card space-y-3">
+      <form onSubmit={keepValues(cAction)} className="card space-y-3">
         <div className="h2">Создать семью</div>
         <p className="muted">Вы получите код приглашения для жены/мужа.</p>
         <input name="name" placeholder="Например: Амангали" className="input" />
-        <Submit>Создать</Submit>
+        <Submit busy={cBusy}>Создать</Submit>
         <Notice state={cState} />
       </form>
-      <form action={jAction} className="card space-y-3">
+      <form onSubmit={keepValues(jAction)} className="card space-y-3">
         <div className="h2">Присоединиться</div>
         <p className="muted">Введите код, который вам прислали.</p>
         <input name="code" required placeholder="AB12CD34" className="input uppercase" />
-        <Submit>Присоединиться</Submit>
+        <Submit busy={jBusy}>Присоединиться</Submit>
         <Notice state={jState} />
       </form>
     </div>
@@ -29,11 +29,11 @@ export function CreateJoin() {
 }
 
 export function NameForm({ name }: { name: string }) {
-  const [state, action] = useActionState(updateName, undefined);
+  const [state, action, busy] = useActionState(updateName, undefined);
   return (
-    <form action={action} className="flex items-center gap-2">
+    <form onSubmit={keepValues(action)} className="flex items-center gap-2">
       <input name="name" defaultValue={name} className="input max-w-60" />
-      <Submit className="btn-ghost">Сохранить имя</Submit>
+      <Submit className="btn-ghost" busy={busy}>Сохранить имя</Submit>
       <Notice state={state} />
     </form>
   );

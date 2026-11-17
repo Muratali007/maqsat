@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { createGoal, updateGoal, type ActionState } from "../actions";
 import { HORIZONS, SPHERES, VISIBILITY } from "@/lib/constants";
-import { Notice, Submit } from "@/components/ui";
+import { Notice, Submit, keepValues } from "@/components/ui";
 import { Soon } from "@/components/Soon";
 import { AI_ENABLED } from "@/lib/flags";
 import type { Goal, Profile } from "@/lib/types";
@@ -13,11 +13,11 @@ type Smart = {
   checks: { letter: string; ok: boolean; tip: string }[]; comment: string;
 };
 
-export function GoalForm({ goal, defaults = {}, parents, members, hasFamily }: {
-  goal?: Goal; defaults?: Partial<Goal>; parents: Pick<Goal, "id" | "title" | "horizon">[]; members: Profile[]; hasFamily: boolean;
+export function GoalForm({ goal, defaults = {}, parents, members, hasFamily, lockVisibility = false }: {
+  goal?: Goal; defaults?: Partial<Goal>; parents: Pick<Goal, "id" | "title" | "horizon">[]; members: Profile[]; hasFamily: boolean; lockVisibility?: boolean;
 }) {
   const action = goal ? updateGoal.bind(null, goal.id) : createGoal;
-  const [state, formAction] = useActionState<ActionState, FormData>(action, undefined);
+  const [state, formAction, busy] = useActionState<ActionState, FormData>(action, undefined);
   const v = { ...defaults, ...goal };
   const form = useRef<HTMLFormElement>(null);
   const [visibility, setVisibility] = useState<string>(v.visibility ?? "private");
@@ -52,7 +52,7 @@ export function GoalForm({ goal, defaults = {}, parents, members, hasFamily }: {
   }
 
   return (
-    <form ref={form} action={formAction} className="space-y-4">
+    <form ref={form} onSubmit={keepValues(formAction)} className="space-y-4">
       <div>
         <label className="label">Цель</label>
         <textarea name="title" rows={2} required defaultValue={v.title ?? ""} className="input" placeholder="Например: накопить подушку безопасности" />
@@ -128,10 +128,12 @@ export function GoalForm({ goal, defaults = {}, parents, members, hasFamily }: {
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label">Кто видит</label>
-          <select name="visibility" value={visibility} onChange={(e) => setVisibility(e.target.value)} className="input">
+          {lockVisibility && <input type="hidden" name="visibility" value={visibility} />}
+          <select name={lockVisibility ? undefined : "visibility"} value={visibility} disabled={lockVisibility} onChange={(e) => setVisibility(e.target.value)} className="input">
             {VISIBILITY.map((o) => <option key={o.id} value={o.id} disabled={o.id !== "private" && !hasFamily}>{o.label}</option>)}
           </select>
           {!hasFamily && <p className="mt-1 text-xs text-muted">Делиться можно после создания семьи.</p>}
+          {lockVisibility && <p className="mt-1 text-xs text-muted">{visibility === "family" ? "Общая цель остаётся общей — её можно завершить или отказаться." : "Видимость меняет только автор."}</p>}
         </div>
         {visibility === "family" && (
           <div>
@@ -144,7 +146,7 @@ export function GoalForm({ goal, defaults = {}, parents, members, hasFamily }: {
         )}
       </div>
       <div className="flex items-center gap-3">
-        <Submit>{goal ? "Сохранить" : "Создать цель"}</Submit>
+        <Submit busy={busy}>{goal ? "Сохранить" : "Создать цель"}</Submit>
         <Notice state={state} />
       </div>
     </form>

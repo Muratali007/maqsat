@@ -39,6 +39,7 @@ export interface Family {
   id: string;
   name: string;
   invite_code: string;
+  created_by: string;
 }
 
 export interface Review {

@@ -1,12 +1,11 @@
 import { SPHERES, fmtDate } from "@/lib/constants";
 import { getSession } from "@/lib/session";
+import { wheelHistory } from "@/lib/data";
 import { WheelForm } from "./WheelForm";
 
 export default async function WheelPage() {
-  const { supabase, user } = await getSession();
-  const { data } = await supabase.from("wheel_scores").select("scores, created_at").eq("user_id", user.id)
-    .order("created_at", { ascending: false }).limit(6);
-  const history = (data ?? []) as { scores: Record<string, number>; created_at: string }[];
+  const { ctx } = await getSession();
+  const history = await wheelHistory(ctx, 6);
   return (
     <div className="space-y-5">
       <div>

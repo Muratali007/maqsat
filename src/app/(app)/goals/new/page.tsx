@@ -1,13 +1,13 @@
 import { childHorizon } from "@/lib/constants";
 import { getSession } from "@/lib/session";
+import { listGoals } from "@/lib/data";
 import type { Goal } from "@/lib/types";
 import { GoalForm } from "../GoalForm";
 
 export default async function NewGoal(props: PageProps<"/goals/new">) {
   const sp = await props.searchParams;
-  const { supabase, family, members } = await getSession();
-  const { data } = await supabase.from("goals").select("id, title, horizon, sphere, visibility").eq("status", "active").neq("horizon", "90d").order("created_at");
-  const parents = (data ?? []) as Pick<Goal, "id" | "title" | "horizon" | "sphere" | "visibility">[];
+  const { family, members, ctx } = await getSession();
+  const parents = await listGoals(ctx, { status: "active", horizonNot: "90d" });
   const parent = parents.find((p) => p.id === sp.parent);
   const defaults: Partial<Goal> = parent
     ? { parent_id: parent.id, horizon: childHorizon(parent.horizon) ?? "90d", sphere: parent.sphere, visibility: parent.visibility }

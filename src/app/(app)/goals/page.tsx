@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Empty, GoalCard } from "@/components/bits";
 import { HORIZONS } from "@/lib/constants";
 import { getSession } from "@/lib/session";
+import { listGoals } from "@/lib/data";
 import type { Goal, Profile } from "@/lib/types";
 
 function Tree({ g, all, members, me, depth = 0 }: { g: Goal; all: Goal[]; members: Profile[]; me: string; depth?: number }) {
@@ -24,9 +25,8 @@ const FILTERS = [
 
 export default async function GoalsPage(props: PageProps<"/goals">) {
   const { f = "all" } = await props.searchParams;
-  const { supabase, user, family, members } = await getSession();
-  const { data } = await supabase.from("goals").select("*").order("deadline", { nullsFirst: false });
-  let goals = ((data ?? []) as Goal[]).filter((g) => g.status !== "dropped");
+  const { user, family, members, ctx } = await getSession();
+  let goals = await listGoals(ctx, { status: "not_dropped" });
   goals = goals.filter((g) => (f === "done" ? g.status === "done" : g.status === "active"));
   if (f === "mine") goals = goals.filter((g) => g.owner_id === user.id && g.visibility !== "family");
   if (f === "family") goals = goals.filter((g) => g.visibility === "family");

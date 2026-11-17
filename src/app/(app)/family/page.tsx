@@ -3,14 +3,14 @@ import { Empty, GoalCard } from "@/components/bits";
 import { AiFeedback, ReviewForm } from "@/components/ReviewForm";
 import { FAMILY_REVIEW_QUESTIONS, fmtDate, monthStart } from "@/lib/constants";
 import { getSession } from "@/lib/session";
-import type { Goal, Review } from "@/lib/types";
+import { listGoals, reviewHistory } from "@/lib/data";
 import { addFamilyGoal } from "../actions";
 import { Soon } from "@/components/Soon";
 import { AI_ENABLED } from "@/lib/flags";
 import { CopyCode, CreateJoin, FamilyGoalIdeas, NameForm } from "./FamilyForms";
 
 export default async function FamilyPage() {
-  const { supabase, user, me, family, members } = await getSession();
+  const { user, me, family, members, ctx } = await getSession();
   if (!family) {
     return (
       <div className="space-y-5">
@@ -25,14 +25,10 @@ export default async function FamilyPage() {
   }
 
   const month = monthStart();
-  const [goalsRes, reviewsRes] = await Promise.all([
-    supabase.from("goals").select("*").eq("family_id", family.id).neq("status", "dropped").order("deadline", { nullsFirst: false }),
-    supabase.from("reviews").select("*").eq("family_id", family.id).eq("kind", "family").order("period_start", { ascending: false }).limit(6),
-  ]);
-  const goals = (goalsRes.data ?? []) as Goal[];
+  const [all, reviews] = await Promise.all([listGoals(ctx, { status: "not_dropped" }), reviewHistory(ctx, "family", 6)]);
+  const goals = all.filter((g) => g.family_id === family.id);
   const common = goals.filter((g) => g.visibility === "family");
   const shared = goals.filter((g) => g.visibility === "shared" && g.owner_id !== user.id);
-  const reviews = (reviewsRes.data ?? []) as Review[];
   const thisMonth = reviews.find((r) => r.period_start === month);
 
   return (

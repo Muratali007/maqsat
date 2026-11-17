@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { aiErrorMessage, buildContext, structured } from "@/lib/ai";
-import { getSession } from "@/lib/session";
+import { currentSession } from "@/lib/session";
 
 const Ideas = z.object({
   goals: z.array(z.object({
@@ -15,9 +15,10 @@ const Ideas = z.object({
 
 export async function POST() {
   try {
-    const s = await getSession();
+    const s = await currentSession();
+    if (!s) return Response.json({ error: "Войдите заново" }, { status: 401 });
     if (!s.family) return Response.json({ error: "Сначала создайте семью" }, { status: 400 });
-    const context = await buildContext({ supabase: s.supabase, userId: s.user.id, me: s.me, family: s.family, members: s.members });
+    const context = await buildContext(s);
     const task = `Предложи 3–5 ОБЩИХ семейных целей для этой пары: на основе видения семьи, личных видений и целей, которые видны в контексте. Не повторяй уже существующие семейные цели. Смешай горизонты: что-то большое (3 года) и что-то близкое и приятное (90 дней). Если в целях есть противоречия по деньгам или времени — скажи в comment.`;
     return Response.json(await structured({ schema: Ideas, context, task }));
   } catch (e) {

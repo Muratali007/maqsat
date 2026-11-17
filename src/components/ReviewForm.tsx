@@ -2,12 +2,12 @@
 
 import { useActionState, useState } from "react";
 import { saveReview } from "@/app/(app)/actions";
-import { Markdown, Submit } from "@/components/ui";
+import { Markdown, Submit, keepValues } from "@/components/ui";
 
 export function ReviewForm({ kind, periodStart, questions }: { kind: "weekly" | "family"; periodStart: string; questions: { id: string; q: string }[] }) {
-  const [state, action] = useActionState(saveReview, undefined);
+  const [state, action, busy] = useActionState(saveReview, undefined);
   return (
-    <form action={action} className="space-y-3">
+    <form onSubmit={keepValues(action)} className="space-y-3">
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="period_start" value={periodStart} />
       {questions.map((q) => (
@@ -16,7 +16,7 @@ export function ReviewForm({ kind, periodStart, questions }: { kind: "weekly" | 
           <textarea name={`q_${q.id}`} rows={2} className="input" />
         </div>
       ))}
-      <Submit>Сохранить обзор</Submit>
+      <Submit busy={busy}>Сохранить обзор</Submit>
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
     </form>
   );

@@ -1,14 +1,15 @@
 @AGENTS.md
 
-# Цели — семейный трекер целей
+# Мақсат — семейный трекер целей
 
-Общаться с владельцем по-русски. Подробности установки и устройства — README.md.
+Общаться с владельцем по-русски. Подробности — README.md. Стек и деплой как у Казыны (`../family-budget`): Render + Neon + GitHub `Muratali007`.
 
 - Next.js 16: `proxy.ts` вместо middleware, `params`/`searchParams`/`cookies()` только async, типы `PageProps<"/route">`.
-  Перед изменениями сверяться с `node_modules/next/dist/docs/`. `cacheComponents` выключен сознательно (всё персональное, динамическое).
-- Tailwind 4: свои классы (`card`, `btn-primary`, `input`…) объявлены через `@utility` в `globals.css`.
-- Доступ к данным — только через RLS (`supabase/schema.sql`). Меняя схему, обновлять policy и этот файл.
-- ИИ: `src/lib/ai.ts`, модель по умолчанию `claude-opus-5-5`, `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`),
-  системный промпт неизменный (кэшируется), контекст пользователя — в первом user-сообщении.
-- ИИ сейчас выключен (решение владельца): флаг `NEXT_PUBLIC_AI_ENABLED` (`src/lib/flags.ts`), при `0` вместо ИИ-кнопок компонент `Soon` («скоро»), API отвечает «скоро появятся».
-- Проверка: `npx tsc --noEmit && npx eslint src && npm run build` (для build нужны NEXT_PUBLIC_SUPABASE_* в env).
+  Перед изменениями сверяться с `node_modules/next/dist/docs/`. `cacheComponents` выключен сознательно.
+- Tailwind 4: свои классы (`card`, `btn-primary`, `input`…) — через `@utility` в `globals.css`.
+- База: `src/lib/db.ts` (pg при `DATABASE_URL`, иначе PGlite). Доступ к данным — ТОЛЬКО через `src/lib/data.ts`, там правила приватности.
+  Меняя правила — дописывать `test/access.test.ts`.
+- Формы с `useActionState` отправляются через `keepValues()` (ui.tsx), чтобы React 19 не стирал введённое при ошибке.
+- ИИ выключен (решение владельца): `NEXT_PUBLIC_AI_ENABLED=0` → компонент `Soon` («скоро»). Код в `src/lib/ai.ts`, модель `claude-opus-5-5`.
+- Проверка: `npx tsc --noEmit && npx eslint src test && npm test && npm run build`.
+- Никогда не направлять тесты (`npm test` с `DATABASE_URL`) на прод-базу Neon.

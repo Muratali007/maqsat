@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { aiErrorMessage, buildContext, structured } from "@/lib/ai";
 import { horizon, sphere } from "@/lib/constants";
-import { getSession } from "@/lib/session";
+import { currentSession } from "@/lib/session";
 
 const Smart = z.object({
   title: z.string().describe("Переформулированная SMART-цель, одна фраза"),
@@ -19,9 +19,10 @@ const Smart = z.object({
 
 export async function POST(req: Request) {
   try {
-    const s = await getSession();
+    const s = await currentSession();
+    if (!s) return Response.json({ error: "Войдите заново" }, { status: 401 });
     const body = await req.json();
-    const context = await buildContext({ supabase: s.supabase, userId: s.user.id, me: s.me, family: s.family, members: s.members });
+    const context = await buildContext(s);
     const task = `Пользователь создаёт цель. Сделай из неё SMART-цель с учётом его контекста и горизонта.
 Исходная формулировка: «${String(body.title ?? "").slice(0, 500)}»
 Сфера: ${sphere(body.sphere).label}. Горизонт: ${horizon(body.horizon).label}.${body.why ? ` Зачем: ${String(body.why).slice(0, 500)}.` : ""}${body.deadline ? ` Желаемый срок: ${body.deadline}.` : ""}

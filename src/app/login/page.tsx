@@ -1,56 +1,53 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useActionState, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { login, register } from "./actions";
+import { Submit, keepValues } from "@/components/ui";
+
+function Forms() {
+  const params = useSearchParams();
+  const invite = params.get("code") ?? "";
+  const [mode, setMode] = useState<"login" | "register">(invite ? "register" : "login");
+  const [lState, lAction, lBusy] = useActionState(login, undefined);
+  const [rState, rAction, rBusy] = useActionState(register, undefined);
+  return (
+    <div className="card w-full max-w-sm space-y-5">
+      <div className="text-center">
+        <div className="text-4xl">🎯</div>
+        <h1 className="h1 mt-2">Мақсат</h1>
+        <p className="muted mt-1">Цели семьи: видение, цели на 10 лет → 90 дней и обзоры недели</p>
+      </div>
+      <div className="grid grid-cols-2 rounded-xl border border-line p-1 text-sm">
+        <button onClick={() => setMode("login")} className={`rounded-lg py-1.5 ${mode === "login" ? "bg-accent text-white" : ""}`}>Вход</button>
+        <button onClick={() => setMode("register")} className={`rounded-lg py-1.5 ${mode === "register" ? "bg-accent text-white" : ""}`}>Регистрация</button>
+      </div>
+      {mode === "login" ? (
+        <form onSubmit={keepValues(lAction)} className="space-y-3">
+          <input name="email" type="email" required autoComplete="email" placeholder="Почта" className="input" />
+          <input name="password" type="password" required autoComplete="current-password" placeholder="Пароль" className="input" />
+          <Submit className="btn-primary w-full" pending="Входим…" busy={lBusy}>Войти</Submit>
+          {lState?.error && <p className="text-sm text-red-600">{lState.error}</p>}
+        </form>
+      ) : (
+        <form onSubmit={keepValues(rAction)} className="space-y-3">
+          <input name="name" required autoComplete="given-name" placeholder="Ваше имя" className="input" />
+          <input name="email" type="email" required autoComplete="email" placeholder="Почта" className="input" />
+          <input name="password" type="password" required minLength={6} autoComplete="new-password" placeholder="Пароль (от 6 символов)" className="input" />
+          <input name="code" defaultValue={invite} placeholder="Код семьи (если пригласили)" className="input uppercase" />
+          <Submit className="btn-primary w-full" pending="Создаём…" busy={rBusy}>Создать аккаунт</Submit>
+          {rState?.error && <p className="text-sm text-red-600">{rState.error}</p>}
+        </form>
+      )}
+    </div>
+  );
+}
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const supabase = createClient();
-  const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined;
-
-  async function google() {
-    setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
-    if (error) setError(error.message);
-  }
-
-  async function magic(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-    setBusy(false);
-    if (error) setError(error.message);
-    else setSent(true);
-  }
-
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
-      <div className="card w-full max-w-sm space-y-5">
-        <div className="text-center">
-          <div className="text-4xl">🎯</div>
-          <h1 className="h1 mt-2">Цели</h1>
-          <p className="muted mt-1">Карта жизни для вас двоих: видение, цели и ИИ-коуч</p>
-        </div>
-        <button onClick={google} className="btn-ghost w-full">
-          <span className="font-bold text-[#4285F4]">G</span> Войти через Google
-        </button>
-        <div className="flex items-center gap-3 text-xs text-muted">
-          <div className="h-px flex-1 bg-line" />или по почте<div className="h-px flex-1 bg-line" />
-        </div>
-        {sent ? (
-          <p className="rounded-xl bg-accent-soft p-3 text-sm">Мы отправили ссылку для входа на <b>{email}</b>. Откройте письмо на этом устройстве.</p>
-        ) : (
-          <form onSubmit={magic} className="space-y-3">
-            <input className="input" type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button className="btn-primary w-full" disabled={busy}>{busy ? "Отправляем…" : "Получить ссылку для входа"}</button>
-          </form>
-        )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </div>
+      <Suspense><Forms /></Suspense>
     </main>
   );
 }

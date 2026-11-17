@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
 import { childHorizon, weekStart } from "@/lib/constants";
+import * as data from "@/lib/data";
+import { dbError, q } from "@/lib/db";
+import { getSession } from "@/lib/session";
 
 export type ActionState = { error?: string; ok?: boolean } | undefined;
 
@@ -17,49 +19,47 @@ const num = (f: FormData, k: string) => {
   const n = Number(v.replace(",", ".").replace(/\s/g, ""));
   return Number.isFinite(n) ? n : null;
 };
+const answersOf = (f: FormData) => {
+  const a: Record<string, string> = {};
+  for (const [k, v] of f.entries()) if (k.startsWith("q_") && typeof v === "string") a[k.slice(2)] = v.slice(0, 5000);
+  return a;
+};
+const fail = (e: unknown): ActionState => ({ error: dbError(e) });
 
 // ------------------------------------------------------------ profile
 export async function updateName(_: ActionState, f: FormData): Promise<ActionState> {
-  const { supabase, user } = await getSession();
-  const { error } = await supabase.from("profiles").update({ name: str(f, "name") }).eq("id", user.id);
-  if (error) return { error: error.message };
+  const { user } = await getSession();
+  const name = str(f, "name");
+  if (!name) return { error: "Имя не может быть пустым" };
+  await q("update users set name = $2 where id = $1", [user.id, name.slice(0, 80)]);
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
 // ------------------------------------------------------------ vision & wheel
 export async function saveVision(_: ActionState, f: FormData): Promise<ActionState> {
-  const { supabase, user, family } = await getSession();
-  const scope = str(f, "scope");
-  const answers: Record<string, string> = {};
-  for (const [k, v] of f.entries()) if (k.startsWith("q_") && typeof v === "string") answers[k.slice(2)] = v;
-  const familyId = scope === "family" ? family?.id ?? null : null;
-  if (scope === "family" && !familyId) return { error: "Сначала создайте семью или присоединитесь к ней" };
-
-  let q = supabase.from("visions").select("id").limit(1);
-  q = familyId ? q.eq("family_id", familyId) : q.eq("owner_id", user.id).is("family_id", null);
-  const { data: existing } = await q.maybeSingle();
-  const { error } = existing
-    ? await supabase.from("visions").update({ answers, updated_at: new Date().toISOString() }).eq("id", existing.id)
-    : await supabase.from("visions").insert({ owner_id: user.id, family_id: familyId, answers });
-  if (error) return { error: error.message };
+  const { ctx } = await getSession();
+  try {
+    await data.saveVision(ctx, str(f, "scope") === "family" ? "family" : "personal", answersOf(f));
+  } catch (e) { return fail(e); }
   revalidatePath("/vision");
   return { ok: true };
 }
 
 export async function saveWheel(scores: Record<string, number>): Promise<ActionState> {
-  const { supabase, user } = await getSession();
-  const { error } = await supabase.from("wheel_scores").insert({ user_id: user.id, scores });
-  if (error) return { error: error.message };
+  const { ctx } = await getSession();
+  const clean = Object.fromEntries(Object.entries(scores).map(([k, v]) => [k, Math.max(1, Math.min(10, Math.round(Number(v) || 1)))]));
+  await data.saveWheel(ctx, clean);
   revalidatePath("/wheel");
   revalidatePath("/");
   return { ok: true };
 }
 
 // ------------------------------------------------------------ goals
-function goalFields(f: FormData) {
+function goalInput(f: FormData): data.GoalInput {
+  const vis = str(f, "visibility");
   return {
-    title: str(f, "title"),
+    title: (str(f, "title") ?? "").slice(0, 300),
     why: str(f, "why"),
     sphere: str(f, "sphere") ?? "career",
     horizon: str(f, "horizon") ?? "1y",
@@ -67,54 +67,44 @@ function goalFields(f: FormData) {
     target: num(f, "target"),
     unit: str(f, "unit"),
     deadline: str(f, "deadline"),
-    visibility: (str(f, "visibility") ?? "private") as "private" | "shared" | "family",
+    visibility: vis === "shared" || vis === "family" ? vis : "private",
     parent_id: str(f, "parent_id"),
     assignee_id: str(f, "assignee_id"),
   };
 }
 
 export async function createGoal(_: ActionState, f: FormData): Promise<ActionState> {
-  const { supabase, user, family } = await getSession();
-  const g = goalFields(f);
+  const { ctx } = await getSession();
+  const g = goalInput(f);
   if (!g.title) return { error: "Напишите название цели" };
-  if (g.visibility !== "private" && !family) return { error: "Чтобы делиться целями, создайте семью (раздел «Семья»)" };
-  const { data, error } = await supabase
-    .from("goals")
-    .insert({ ...g, owner_id: user.id, family_id: g.visibility === "private" ? null : family!.id })
-    .select("id")
-    .single();
-  if (error) return { error: error.message };
+  let id: string;
+  try { id = await data.insertGoal(ctx, g); } catch (e) { return fail(e); }
   revalidatePath("/goals");
-  redirect(`/goals/${data.id}`);
+  redirect(`/goals/${id}`);
 }
 
 export async function updateGoal(id: string, _: ActionState, f: FormData): Promise<ActionState> {
-  const { supabase, family } = await getSession();
-  const g = goalFields(f);
+  const { ctx } = await getSession();
+  const g = goalInput(f);
   if (!g.title) return { error: "Напишите название цели" };
-  if (g.visibility !== "private" && !family) return { error: "Чтобы делиться целями, создайте семью" };
-  const { error } = await supabase
-    .from("goals")
-    .update({ ...g, family_id: g.visibility === "private" ? null : family!.id })
-    .eq("id", id);
-  if (error) return { error: error.message };
+  try { await data.updateGoal(ctx, id, g); } catch (e) { return fail(e); }
   revalidatePath(`/goals/${id}`);
   revalidatePath("/goals");
   return { ok: true };
 }
 
 export async function setProgress(id: string, f: FormData) {
-  const { supabase } = await getSession();
+  const { ctx } = await getSession();
   const current = num(f, "current");
-  if (current !== null) await supabase.from("goals").update({ current }).eq("id", id);
+  if (current !== null) await data.setGoalField(ctx, id, "current", current);
   revalidatePath(`/goals/${id}`);
   revalidatePath("/");
 }
 
 export async function setStatus(id: string, status: "active" | "done" | "dropped"): Promise<ActionState> {
-  const { supabase } = await getSession();
-  const { error } = await supabase.from("goals").update({ status }).eq("id", id);
-  if (error) return { error: error.message };
+  const { ctx } = await getSession();
+  if (!["active", "done", "dropped"].includes(status)) return { error: "Неверный статус" };
+  try { await data.setGoalField(ctx, id, "status", status); } catch (e) { return fail(e); }
   revalidatePath(`/goals/${id}`);
   revalidatePath("/goals");
   revalidatePath("/");
@@ -122,8 +112,8 @@ export async function setStatus(id: string, status: "active" | "done" | "dropped
 }
 
 export async function deleteGoal(id: string) {
-  const { supabase } = await getSession();
-  await supabase.from("goals").delete().eq("id", id);
+  const { ctx } = await getSession();
+  await data.deleteGoal(ctx, id);
   revalidatePath("/goals");
   redirect("/goals");
 }
@@ -134,114 +124,97 @@ export async function addSuggestions(
   goals: { title: string; deadline?: string | null; metric?: string | null; target?: number | null; unit?: string | null }[],
   tasks: string[],
 ): Promise<ActionState> {
-  const { supabase, user } = await getSession();
-  const { data: parent } = await supabase.from("goals").select("*").eq("id", parentId).single();
-  if (!parent) return { error: "Цель не найдена" };
+  const { ctx } = await getSession();
+  const parent = await data.getGoal(ctx, parentId);
+  if (!parent || !data.canEdit(ctx, parent)) return { error: "Цель не найдена" };
   const h = childHorizon(parent.horizon);
-  if (goals.length && h) {
-    const { error } = await supabase.from("goals").insert(goals.map((g) => ({
-      owner_id: user.id, family_id: parent.family_id, visibility: parent.visibility, sphere: parent.sphere,
-      horizon: h, parent_id: parentId, title: g.title, deadline: g.deadline || null, metric: g.metric || null,
-      target: g.target ?? null, unit: g.unit || null,
-    })));
-    if (error) return { error: error.message };
-  }
-  if (tasks.length) {
-    const { error } = await supabase.from("tasks").insert(tasks.map((t) => ({
-      owner_id: user.id, goal_id: parentId, family_id: parent.visibility === "family" ? parent.family_id : null,
-      title: t, week_start: weekStart(),
-    })));
-    if (error) return { error: error.message };
-  }
+  try {
+    if (h) for (const g of goals) {
+      await data.insertGoal(ctx, {
+        title: g.title, why: null, sphere: parent.sphere, horizon: h, metric: g.metric ?? null, target: g.target ?? null,
+        unit: g.unit ?? null, deadline: g.deadline ?? null, visibility: parent.visibility, parent_id: parentId, assignee_id: null,
+      });
+    }
+    for (const t of tasks) await data.insertTask(ctx, t, parentId, weekStart());
+  } catch (e) { return fail(e); }
   revalidatePath(`/goals/${parentId}`);
   revalidatePath("/goals");
   revalidatePath("/week");
   return { ok: true };
 }
 
-// ------------------------------------------------------------ tasks
-export async function addTask(f: FormData) {
-  const { supabase, user } = await getSession();
-  const title = str(f, "title");
-  if (!title) return;
-  const goalId = str(f, "goal_id");
-  let familyId: string | null = null;
-  if (goalId) {
-    const { data: g } = await supabase.from("goals").select("visibility, family_id").eq("id", goalId).single();
-    if (g?.visibility === "family") familyId = g.family_id;
-  }
-  await supabase.from("tasks").insert({ owner_id: user.id, title, goal_id: goalId, family_id: familyId, week_start: str(f, "week_start") ?? weekStart() });
-  revalidatePath("/week");
-  revalidatePath("/");
-  if (goalId) revalidatePath(`/goals/${goalId}`);
-}
-
-export async function toggleTask(id: string, done: boolean) {
-  const { supabase } = await getSession();
-  await supabase.from("tasks").update({ done }).eq("id", id);
-  revalidatePath("/week");
-  revalidatePath("/");
-}
-
-export async function deleteTask(id: string) {
-  const { supabase } = await getSession();
-  await supabase.from("tasks").delete().eq("id", id);
-  revalidatePath("/week");
-  revalidatePath("/");
-}
-
-// ------------------------------------------------------------ reviews
-export async function saveReview(_: ActionState, f: FormData): Promise<ActionState & { id?: string }> {
-  const { supabase, user, family } = await getSession();
-  const kind = str(f, "kind") === "family" ? "family" : "weekly";
-  if (kind === "family" && !family) return { error: "Нет семьи" };
-  const answers: Record<string, string> = {};
-  for (const [k, v] of f.entries()) if (k.startsWith("q_") && typeof v === "string") answers[k.slice(2)] = v;
-  const { data, error } = await supabase
-    .from("reviews")
-    .insert({ user_id: user.id, family_id: kind === "family" ? family!.id : null, kind, period_start: str(f, "period_start"), answers })
-    .select("id")
-    .single();
-  if (error) return { error: error.message };
-  revalidatePath("/week");
-  revalidatePath("/family");
-  return { ok: true, id: data.id };
-}
-
-// ------------------------------------------------------------ family
-export async function createFamily(_: ActionState, f: FormData): Promise<ActionState> {
-  const { supabase } = await getSession();
-  const { error } = await supabase.rpc("create_family", { fname: str(f, "name") ?? "Наша семья" });
-  if (error) return { error: error.message };
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
-
-export async function joinFamily(_: ActionState, f: FormData): Promise<ActionState> {
-  const { supabase } = await getSession();
-  const { error } = await supabase.rpc("join_family", { code: str(f, "code") ?? "" });
-  if (error) return { error: error.message };
-  revalidatePath("/", "layout");
-  return { ok: true };
-}
-
 /** Add one AI-suggested common family goal. */
 export async function addFamilyGoal(g: { title: string; sphere: string; horizon: string; why: string; deadline: string | null }): Promise<ActionState> {
-  const { supabase, user, family } = await getSession();
-  if (!family) return { error: "Нет семьи" };
-  const { error } = await supabase.from("goals").insert({
-    owner_id: user.id, family_id: family.id, visibility: "family", title: g.title, sphere: g.sphere,
-    horizon: g.horizon, why: g.why, deadline: g.deadline || null,
-  });
-  if (error) return { error: error.message };
+  const { ctx } = await getSession();
+  try {
+    await data.insertGoal(ctx, {
+      title: g.title, why: g.why, sphere: g.sphere, horizon: g.horizon, metric: null, target: null, unit: null,
+      deadline: g.deadline, visibility: "family", parent_id: null, assignee_id: null,
+    });
+  } catch (e) { return fail(e); }
   revalidatePath("/family");
   revalidatePath("/goals");
   revalidatePath("/");
   return { ok: true };
 }
 
+// ------------------------------------------------------------ tasks
+export async function addTask(f: FormData) {
+  const { ctx } = await getSession();
+  const title = str(f, "title");
+  if (!title) return;
+  const goalId = str(f, "goal_id");
+  const week = str(f, "week_start");
+  await data.insertTask(ctx, title.slice(0, 300), goalId, week && /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : weekStart());
+  revalidatePath("/week");
+  revalidatePath("/");
+  if (goalId) revalidatePath(`/goals/${goalId}`);
+}
+
+export async function toggleTask(id: string, done: boolean) {
+  const { ctx } = await getSession();
+  await data.setTaskDone(ctx, id, done);
+  revalidatePath("/week");
+  revalidatePath("/");
+}
+
+export async function deleteTask(id: string) {
+  const { ctx } = await getSession();
+  await data.removeTask(ctx, id);
+  revalidatePath("/week");
+  revalidatePath("/");
+}
+
+// ------------------------------------------------------------ reviews
+export async function saveReview(_: ActionState, f: FormData): Promise<ActionState> {
+  const { ctx } = await getSession();
+  const kind = str(f, "kind") === "family" ? "family" : "weekly";
+  const period = str(f, "period_start");
+  if (!period || !/^\d{4}-\d{2}-\d{2}$/.test(period)) return { error: "Неверная дата" };
+  try { await data.insertReview(ctx, kind, period, answersOf(f)); } catch (e) { return fail(e); }
+  revalidatePath("/week");
+  revalidatePath("/family");
+  return { ok: true };
+}
+
+// ------------------------------------------------------------ family
+export async function createFamily(_: ActionState, f: FormData): Promise<ActionState> {
+  const { user } = await getSession();
+  try { await data.createFamily(user.id, (str(f, "name") ?? "Наша семья").slice(0, 80)); } catch (e) { return fail(e); }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+export async function joinFamily(_: ActionState, f: FormData): Promise<ActionState> {
+  const { user } = await getSession();
+  try { await data.joinFamily(user.id, str(f, "code") ?? ""); } catch (e) { return fail(e); }
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+// ------------------------------------------------------------ AI chat
 export async function clearChat() {
-  const { supabase, user } = await getSession();
-  await supabase.from("chat_messages").delete().eq("user_id", user.id);
+  const { ctx } = await getSession();
+  await data.clearChat(ctx);
   revalidatePath("/coach");
 }

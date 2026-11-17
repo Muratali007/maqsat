@@ -5,7 +5,7 @@ import { Submit } from "@/components/ui";
 import { TaskList } from "@/components/TaskList";
 import { WEEKLY_QUESTIONS, fmtDate, weekStart } from "@/lib/constants";
 import { getSession } from "@/lib/session";
-import type { Goal, Review, Task } from "@/lib/types";
+import { listGoals, reviewFor, reviewHistory, tasksForWeek } from "@/lib/data";
 import { addTask } from "../actions";
 import { Soon } from "@/components/Soon";
 import { AI_ENABLED } from "@/lib/flags";
@@ -20,18 +20,15 @@ export default async function WeekPage(props: PageProps<"/week">) {
   const { w } = await props.searchParams;
   const week = typeof w === "string" && /^\d{4}-\d{2}-\d{2}$/.test(w) ? weekStart(new Date(w + "T00:00:00")) : weekStart();
   const isCurrent = week === weekStart();
-  const { supabase, user } = await getSession();
-  const [tasksRes, goalsRes, reviewRes, historyRes] = await Promise.all([
-    supabase.from("tasks").select("*").eq("week_start", week).order("created_at"),
-    supabase.from("goals").select("id, title, horizon, visibility, owner_id").eq("status", "active"),
-    supabase.from("reviews").select("*").eq("user_id", user.id).eq("kind", "weekly").eq("period_start", week).maybeSingle(),
-    supabase.from("reviews").select("*").eq("user_id", user.id).eq("kind", "weekly").order("period_start", { ascending: false }).limit(8),
+  const { user, ctx } = await getSession();
+  const [tasks, goals, review, allReviews] = await Promise.all([
+    tasksForWeek(ctx, week),
+    listGoals(ctx, { status: "active" }),
+    reviewFor(ctx, "weekly", week),
+    reviewHistory(ctx, "weekly", 8),
   ]);
-  const tasks = (tasksRes.data ?? []) as Task[];
-  const goals = (goalsRes.data ?? []) as Goal[];
   const titles = Object.fromEntries(goals.map((g) => [g.id, g.title]));
-  const review = reviewRes.data as Review | null;
-  const history = ((historyRes.data ?? []) as Review[]).filter((r) => r.period_start !== week);
+  const history = allReviews.filter((r) => r.period_start !== week);
   const done = tasks.filter((t) => t.done).length;
   const myGoals = goals.filter((g) => g.owner_id === user.id || g.visibility === "family");
 

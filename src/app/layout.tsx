@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
-  title: "Цели — карта жизни семьи",
+  title: "Мақсат — цели семьи",
   description: "Видение, цели 10 лет → 90 дней, недельные обзоры и ИИ-коуч для двоих",
 };
 

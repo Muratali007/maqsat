@@ -20,7 +20,7 @@ export function Nav({ name }: { name: string }) {
   return (
     <>
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-line bg-card p-4 md:flex">
-        <Link href="/" className="mb-6 flex items-center gap-2 text-lg font-bold">🎯 Цели</Link>
+        <Link href="/" className="mb-6 flex items-center gap-2 text-lg font-bold">🎯 Мақсат</Link>
         <nav className="flex flex-1 flex-col gap-1">
           {ITEMS.map((i) => (
             <Link key={i.href} href={i.href}

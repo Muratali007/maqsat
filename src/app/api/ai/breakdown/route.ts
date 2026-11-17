@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { aiErrorMessage, buildContext, structured } from "@/lib/ai";
 import { childHorizon, horizon } from "@/lib/constants";
-import { getSession } from "@/lib/session";
-import type { Goal } from "@/lib/types";
+import { currentSession } from "@/lib/session";
+import { getGoal } from "@/lib/data";
 
 const Plan = z.object({
   goals: z.array(z.object({
@@ -18,13 +18,13 @@ const Plan = z.object({
 
 export async function POST(req: Request) {
   try {
-    const s = await getSession();
+    const s = await currentSession();
+    if (!s) return Response.json({ error: "Войдите заново" }, { status: 401 });
     const { goalId } = await req.json();
-    const { data } = await s.supabase.from("goals").select("*").eq("id", goalId).maybeSingle();
-    if (!data) return Response.json({ error: "Цель не найдена" }, { status: 404 });
-    const g = data as Goal;
+    const g = await getGoal(s.ctx, String(goalId));
+    if (!g) return Response.json({ error: "Цель не найдена" }, { status: 404 });
     const child = childHorizon(g.horizon);
-    const context = await buildContext({ supabase: s.supabase, userId: s.user.id, me: s.me, family: s.family, members: s.members });
+    const context = await buildContext(s);
     const task = `Разбей цель «${g.title}» (горизонт ${horizon(g.horizon).label}${g.deadline ? `, срок ${g.deadline}` : ""}${g.target ? `, цель ${g.target} ${g.unit ?? ""}, сейчас ${g.current}` : ""}) на шаги.
 ${child ? `Предложи 2–4 подцели на горизонт «${horizon(child).label}» — SMART, со сроками и метриками, последовательные.` : "Подцелей не нужно (goals = [])."}
 И 3–5 задач на эту неделю, с которых реально начать. Учитывай уже существующие подцели и задачи из контекста — не дублируй их.${g.visibility === "family" ? " Это общая семейная цель: задачи могут быть для обоих." : ""}`;

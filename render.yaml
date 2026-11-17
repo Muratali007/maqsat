@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: maqsat
+    runtime: node
+    plan: free
+    region: frankfurt
+    # devDependencies (TypeScript, Tailwind) нужны для сборки Next.js, хотя NODE_ENV=production
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NEXT_PUBLIC_AI_ENABLED # ИИ пока выключен — на сайте плашки «скоро»
+        value: "0"
+      # Спрашивается при создании сервиса (в репозиторий не попадает)
+      - key: DATABASE_URL # строка подключения Neon
+        sync: false

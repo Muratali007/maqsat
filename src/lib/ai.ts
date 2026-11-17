@@ -2,11 +2,11 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   FAMILY_VISION_QUESTIONS, SPHERES, VISION_QUESTIONS, WEEKLY_QUESTIONS, horizon, sphere, weekStart,
 } from "@/lib/constants";
-import type { Family, Goal, Profile, Review, Task } from "@/lib/types";
+import { getVision, listGoals, reviewHistory, tasksForWeek, wheelHistory } from "@/lib/data";
+import type { Session } from "@/lib/session";
 import { progress } from "@/lib/types";
 import { AI_ENABLED } from "@/lib/flags";
 
@@ -42,19 +42,21 @@ export const COACH_SYSTEM = `Ты — личный коуч по целям дл
 - Ты не финансовый, медицинский или юридический консультант: в таких вопросах давай общие ориентиры и советуй специалиста.
 - Пиши коротко: абзацы по 1–3 предложения, списки где уместно, Markdown можно.`;
 
-type Ctx = { supabase: SupabaseClient; userId: string; me: Profile; family: Family | null; members: Profile[] };
 
 /** Everything the coach should know about the user, as compact text. */
-export async function buildContext({ supabase, userId, me, family, members }: Ctx): Promise<string> {
+export async function buildContext({ ctx, me, family, members }: Session): Promise<string> {
+  const userId = ctx.userId;
   const today = new Date().toISOString().slice(0, 10);
-  const [vision, famVision, wheel, goals, tasks, reviews] = await Promise.all([
-    supabase.from("visions").select("answers").eq("owner_id", userId).is("family_id", null).maybeSingle(),
-    family ? supabase.from("visions").select("answers").eq("family_id", family.id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from("wheel_scores").select("scores, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("goals").select("*").neq("status", "dropped").order("created_at"),
-    supabase.from("tasks").select("*").eq("week_start", weekStart()),
-    supabase.from("reviews").select("*").order("period_start", { ascending: false }).limit(4),
+  const [va, fa, wheel, gs, ts, weekly, fam] = await Promise.all([
+    getVision(ctx, "personal"),
+    family ? getVision(ctx, "family") : Promise.resolve({} as Record<string, string>),
+    wheelHistory(ctx, 1),
+    listGoals(ctx, { status: "not_dropped" }),
+    tasksForWeek(ctx, weekStart()),
+    reviewHistory(ctx, "weekly", 3),
+    reviewHistory(ctx, "family", 1),
   ]);
+  const rs = [...weekly, ...fam];
 
   const L: string[] = [`Сегодня: ${today}. Пользователь: ${me.name ?? "—"}.`];
   if (family) {
@@ -62,18 +64,15 @@ export async function buildContext({ supabase, userId, me, family, members }: Ct
     L.push(`Семья «${family.name}», вместе с: ${others}.`);
   } else L.push("Семья на сайте пока не создана.");
 
-  const va = (vision.data?.answers ?? {}) as Record<string, string>;
   const vLines = VISION_QUESTIONS.filter((q) => va[q.id]?.trim()).map((q) => `- ${q.q} ${va[q.id].trim()}`);
   L.push("", "## Личное видение через 5 лет", vLines.length ? vLines.join("\n") : "(не заполнено)");
 
-  const fa = ((famVision as { data: { answers?: unknown } | null }).data?.answers ?? {}) as Record<string, string>;
   const fLines = FAMILY_VISION_QUESTIONS.filter((q) => fa[q.id]?.trim()).map((q) => `- ${q.q} ${fa[q.id].trim()}`);
   if (family) L.push("", "## Видение семьи", fLines.length ? fLines.join("\n") : "(не заполнено)");
 
-  const sc = (wheel.data?.scores ?? null) as Record<string, number> | null;
+  const sc = wheel[0]?.scores ?? null;
   L.push("", "## Колесо жизни (1–10)", sc ? SPHERES.map((s) => `${s.label}: ${sc[s.id] ?? "—"}`).join("; ") : "(не заполнено)");
 
-  const gs = (goals.data ?? []) as Goal[];
   L.push("", "## Цели");
   if (!gs.length) L.push("(целей пока нет)");
   for (const g of gs) {
@@ -83,10 +82,8 @@ export async function buildContext({ supabase, userId, me, family, members }: Ct
       `${g.deadline ? `, срок ${g.deadline}` : ""}${pr}${g.why ? `. Зачем: ${g.why}` : ""} (id ${g.id.slice(0, 8)}${g.parent_id ? `, под целью ${g.parent_id.slice(0, 8)}` : ""})`);
   }
 
-  const ts = (tasks.data ?? []) as Task[];
   L.push("", "## Задачи этой недели", ts.length ? ts.map((t) => `- [${t.done ? "x" : " "}] ${t.title}`).join("\n") : "(нет)");
 
-  const rs = (reviews.data ?? []) as Review[];
   if (rs.length) {
     L.push("", "## Последние обзоры");
     for (const r of rs) {
