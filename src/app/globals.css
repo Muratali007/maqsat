@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f6f3;
+  --foreground: #1f2328;
+  --muted: #6b7280;
+  --card: #ffffff;
+  --line: #e7e5e0;
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121316;
+    --foreground: #ececec;
+    --muted: #9aa0a6;
+    --card: #1b1d21;
+    --line: #2c2f35;
+    --accent: #8b8cf6;
+    --accent-soft: #23243a;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-inter);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
+
+@utility card { @apply rounded-2xl border border-line bg-card p-5 shadow-sm; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50; }
+@utility btn-primary { @apply btn bg-accent text-white hover:opacity-90; }
+@utility btn-ghost { @apply btn border border-line hover:bg-accent-soft; }
+@utility btn-ai { @apply btn bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white hover:opacity-90; }
+@utility input { @apply w-full rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20; }
+@utility label { @apply mb-1 block text-sm font-medium; }
+@utility h1 { @apply text-2xl font-bold tracking-tight; }
+@utility h2 { @apply text-lg font-semibold; }
+@utility muted { @apply text-sm text-muted; }
+@utility chip { @apply inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-0.5 text-xs; }
+
+
+.prose-ai p { margin: 0.4rem 0; }
+.prose-ai ul { list-style: disc; padding-left: 1.2rem; margin: 0.4rem 0; }
+.prose-ai ol { list-style: decimal; padding-left: 1.2rem; margin: 0.4rem 0; }
+.prose-ai h3, .prose-ai h4 { font-weight: 600; margin-top: 0.6rem; }
+.prose-ai strong { font-weight: 600; }

@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎯 Цели — карта жизни семьи
 
-## Getting Started
+Сайт для двоих (муж и жена): видение жизни, колесо 7 сфер, каскад целей 10 лет → 3 года → 1 год → 90 дней → задачи недели,
+воскресный обзор, общие семейные цели и ИИ-коуч на Claude.
 
-First, run the development server:
+Стек: **Next.js 16** (App Router) · **Supabase** (вход + Postgres с RLS) · **Anthropic API** (Claude) · деплой на **Vercel**.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Запуск локально
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Supabase** (бесплатно): supabase.com → New project.
+   - SQL Editor → New query → вставить `supabase/schema.sql` → Run.
+   - Project Settings → API: скопировать `Project URL` и `anon`/`publishable` key в `.env.local`.
+   - Authentication → URL Configuration → Site URL: `http://localhost:3000`, Redirect URLs: `http://localhost:3000/auth/callback`.
+   - Вход по почте (magic link) работает сразу. Google — Authentication → Providers → Google (нужен OAuth Client в Google Cloud Console).
+2. **Claude**: console.anthropic.com → API Keys → создать ключ → `ANTHROPIC_API_KEY` в `.env.local`.
+   (Это отдельный от подписки Claude Pro счёт: оплата за использование, пополняется в Billing.)
+3. `npm install && npm run dev` → http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Деплой на Vercel
+1. Залить репозиторий на GitHub → vercel.com → Add New Project → импорт.
+2. Environment Variables: те же три переменные из `.env.local`.
+3. В Supabase добавить прод-адрес в Site URL / Redirect URLs (`https://<домен>/auth/callback`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Как устроено
+- `supabase/schema.sql` — таблицы и правила доступа (RLS). Приватность обеспечивает база, а не только интерфейс:
+  `private` — видит только автор; `shared` — личная, видна семье; `family` — общая, редактируют оба.
+  Лимит «не больше 5 целей на год» — триггер в базе.
+- `src/lib/ai.ts` — ИИ: модель `claude-opus-5-5` (можно сменить через `ANTHROPIC_MODEL`), контекст пользователя
+  (`buildContext`), структурированные ответы (Zod), серверный fallback при отказе модели.
+- `src/app/api/ai/*` — SMART-помощник, разбивка цели на шаги, разбор обзора, идеи семейных целей; `src/app/api/coach` — чат (стриминг).
+- `src/app/(app)/*` — страницы; `actions.ts` — все записи в базу (server actions).
+- `src/proxy.ts` — обновляет сессию и закрывает страницы от неавторизованных (в Next 16 middleware называется proxy).
