@@ -4,6 +4,8 @@ import { useActionState, useRef, useState } from "react";
 import { createGoal, updateGoal, type ActionState } from "../actions";
 import { HORIZONS, SPHERES, VISIBILITY } from "@/lib/constants";
 import { Notice, Submit } from "@/components/ui";
+import { Soon } from "@/components/Soon";
+import { AI_ENABLED } from "@/lib/flags";
 import type { Goal, Profile } from "@/lib/types";
 
 type Smart = {
@@ -55,6 +57,7 @@ export function GoalForm({ goal, defaults = {}, parents, members, hasFamily }: {
         <label className="label">Цель</label>
         <textarea name="title" rows={2} required defaultValue={v.title ?? ""} className="input" placeholder="Например: накопить подушку безопасности" />
       </div>
+      {!AI_ENABLED ? <Soon compact title="SMART-помощник" text="ИИ превратит «хочу стать богатым» в конкретную цель с цифрой, сроком и проверкой по SMART." /> : (
       <div className="rounded-xl border border-violet-300/60 bg-violet-50/60 p-3 dark:bg-violet-950/20">
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={makeSmart} className="btn-ai" disabled={aiBusy}>{aiBusy ? "Думаю…" : "✨ Сделать SMART"}</button>
@@ -76,6 +79,7 @@ export function GoalForm({ goal, defaults = {}, parents, members, hasFamily }: {
           </div>
         )}
       </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label">Сфера</label>

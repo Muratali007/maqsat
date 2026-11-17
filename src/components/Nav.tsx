@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AI_ENABLED } from "@/lib/flags";
 
 const ITEMS = [
   { href: "/", label: "Главная", icon: "🏠" },
@@ -25,6 +26,7 @@ export function Nav({ name }: { name: string }) {
             <Link key={i.href} href={i.href}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${active(i.href) ? "bg-accent-soft font-semibold text-accent" : "hover:bg-accent-soft"}`}>
               <span>{i.icon}</span>{i.label}
+              {i.href === "/coach" && !AI_ENABLED && <span className="ml-auto rounded-full bg-accent-soft px-1.5 text-[10px] text-accent">скоро</span>}
             </Link>
           ))}
         </nav>

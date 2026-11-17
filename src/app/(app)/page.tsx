@@ -3,6 +3,7 @@ import { Empty, GoalCard, ProgressBar } from "@/components/bits";
 import { TaskList } from "@/components/TaskList";
 import { MAX_YEAR_GOALS, SPHERES, weekStart } from "@/lib/constants";
 import { getSession } from "@/lib/session";
+import { AI_ENABLED } from "@/lib/flags";
 import type { Goal, Task } from "@/lib/types";
 
 export default async function Home() {
@@ -102,8 +103,8 @@ export default async function Home() {
           )}
 
           <Link href="/coach" className="card block bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white">
-            <div className="font-semibold">✨ ИИ-коуч</div>
-            <div className="text-sm opacity-90">Спросите, с чего начать, как разбить цель или почему не получается.</div>
+            <div className="font-semibold">✨ ИИ-коуч {!AI_ENABLED && <span className="ml-1 rounded-full bg-white/25 px-2 py-0.5 text-xs">скоро</span>}</div>
+            <div className="text-sm opacity-90">{AI_ENABLED ? "Спросите, с чего начать, как разбить цель или почему не получается." : "Личный коуч, который знает ваши цели. Уже готовим!"}</div>
           </Link>
         </aside>
       </div>

@@ -8,6 +8,7 @@ import {
 } from "@/lib/constants";
 import type { Family, Goal, Profile, Review, Task } from "@/lib/types";
 import { progress } from "@/lib/types";
+import { AI_ENABLED } from "@/lib/flags";
 
 export const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 // Server-side fallback: if the model declines a request, the API retries it on the recommended fallback model.
@@ -15,12 +16,12 @@ const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 let _client: Anthropic | null = null;
 export function ai(): Anthropic {
-  if (!process.env.ANTHROPIC_API_KEY) throw new AiNotConfigured();
+  if (!AI_ENABLED || !process.env.ANTHROPIC_API_KEY) throw new AiNotConfigured();
   return (_client ??= new Anthropic());
 }
 export class AiNotConfigured extends Error {
   constructor() {
-    super("ИИ не подключён: добавьте ANTHROPIC_API_KEY в .env.local (локально) или в настройки Vercel.");
+    super("ИИ-функции скоро появятся.");
   }
 }
 

@@ -5,6 +5,8 @@ import { FAMILY_REVIEW_QUESTIONS, fmtDate, monthStart } from "@/lib/constants";
 import { getSession } from "@/lib/session";
 import type { Goal, Review } from "@/lib/types";
 import { addFamilyGoal } from "../actions";
+import { Soon } from "@/components/Soon";
+import { AI_ENABLED } from "@/lib/flags";
 import { CopyCode, CreateJoin, FamilyGoalIdeas, NameForm } from "./FamilyForms";
 
 export default async function FamilyPage() {
@@ -62,7 +64,8 @@ export default async function FamilyPage() {
         </div>
         {common.length ? <div className="grid gap-3 sm:grid-cols-2">{common.map((g) => <GoalCard key={g.id} g={g} members={members} me={user.id} />)}</div>
           : <Empty>Общих целей пока нет.</Empty>}
-        <FamilyGoalIdeas addAction={addFamilyGoal} />
+        {AI_ENABLED ? <FamilyGoalIdeas addAction={addFamilyGoal} />
+          : <Soon title="Идеи общих целей" text="ИИ посмотрит видение семьи и цели обоих и предложит общие — и подскажет, если цели конфликтуют по деньгам или времени." />}
       </section>
 
       {shared.length > 0 && (
@@ -79,7 +82,8 @@ export default async function FamilyPage() {
             {FAMILY_REVIEW_QUESTIONS.map((q) => thisMonth.answers[q.id] ? (
               <div key={q.id}><dt className="text-muted">{q.q}</dt><dd className="whitespace-pre-wrap">{thisMonth.answers[q.id]}</dd></div>) : null)}
           </dl>
-          <AiFeedback reviewId={thisMonth.id} initial={thisMonth.ai_feedback} />
+          {AI_ENABLED ? <AiFeedback reviewId={thisMonth.id} initial={thisMonth.ai_feedback} />
+            : <Soon compact title="Разбор семейного обзора" text="Коуч даст разбор для вас обоих: что получилось, где буксуете и что сделать вместе в следующем месяце." />}
         </>) : (<>
           <p className="muted">Сядьте вдвоём раз в месяц на 30 минут и ответьте вместе.</p>
           <ReviewForm kind="family" periodStart={month} questions={FAMILY_REVIEW_QUESTIONS} />

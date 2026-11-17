@@ -7,6 +7,8 @@ import { WEEKLY_QUESTIONS, fmtDate, weekStart } from "@/lib/constants";
 import { getSession } from "@/lib/session";
 import type { Goal, Review, Task } from "@/lib/types";
 import { addTask } from "../actions";
+import { Soon } from "@/components/Soon";
+import { AI_ENABLED } from "@/lib/flags";
 
 const shift = (d: string, days: number) => {
   const x = new Date(d + "T00:00:00Z");
@@ -70,7 +72,8 @@ export default async function WeekPage(props: PageProps<"/week">) {
               <div key={q.id}><dt className="text-muted">{q.q}</dt><dd className="whitespace-pre-wrap">{review.answers[q.id]}</dd></div>
             ) : null)}
           </dl>
-          <AiFeedback reviewId={review.id} initial={review.ai_feedback} />
+          {AI_ENABLED ? <AiFeedback reviewId={review.id} initial={review.ai_feedback} />
+            : <Soon compact title="Разбор обзора от ИИ" text="Коуч прочитает обзор вместе с вашими целями, найдёт закономерности и уточнит три главные задачи на неделю." />}
         </>) : (<>
           <p className="muted">Не ругайте себя за невыполненное — корректируйте план.</p>
           <ReviewForm kind="weekly" periodStart={week} questions={WEEKLY_QUESTIONS} />

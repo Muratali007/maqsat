@@ -9,6 +9,8 @@ import { progress, type Goal, type Task } from "@/lib/types";
 import { addTask, setProgress } from "../../actions";
 import { GoalForm } from "../GoalForm";
 import { Breakdown } from "./Breakdown";
+import { Soon } from "@/components/Soon";
+import { AI_ENABLED } from "@/lib/flags";
 import { GoalActions } from "./GoalActions";
 
 const VIS = { private: "🔒 Только я", shared: "👀 Видна семье", family: "👨‍👩‍👧 Общая семейная" };
@@ -69,7 +71,8 @@ export default async function GoalPage(props: PageProps<"/goals/[id]">) {
         {canEdit && <GoalActions id={g.id} status={g.status} canDelete={g.owner_id === user.id} />}
       </div>
 
-      {canEdit && g.status === "active" && <Breakdown goalId={g.id} childLabel={child ? horizon(child).label : null} />}
+      {canEdit && g.status === "active" && (AI_ENABLED ? <Breakdown goalId={g.id} childLabel={child ? horizon(child).label : null} />
+        : <Soon title="Разбить на шаги" text="ИИ разложит цель на подцели следующего уровня и 3–5 задач на эту неделю — останется отметить галочками нужные." />)}
 
       {child && (
         <section className="space-y-2">

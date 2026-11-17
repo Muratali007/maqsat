@@ -12,13 +12,13 @@
    - Project Settings → API: скопировать `Project URL` и `anon`/`publishable` key в `.env.local`.
    - Authentication → URL Configuration → Site URL: `http://localhost:3000`, Redirect URLs: `http://localhost:3000/auth/callback`.
    - Вход по почте (magic link) работает сразу. Google — Authentication → Providers → Google (нужен OAuth Client в Google Cloud Console).
-2. **Claude**: console.anthropic.com → API Keys → создать ключ → `ANTHROPIC_API_KEY` в `.env.local`.
+2. **Claude** (пока выключен — на сайте плашки «скоро»; включить: `NEXT_PUBLIC_AI_ENABLED=1`): console.anthropic.com → API Keys → создать ключ → `ANTHROPIC_API_KEY` в `.env.local`.
    (Это отдельный от подписки Claude Pro счёт: оплата за использование, пополняется в Billing.)
 3. `npm install && npm run dev` → http://localhost:3000
 
 ## Деплой на Vercel
 1. Залить репозиторий на GitHub → vercel.com → Add New Project → импорт.
-2. Environment Variables: те же три переменные из `.env.local`.
+2. Environment Variables: переменные из `.env.local` (без ИИ достаточно двух `NEXT_PUBLIC_SUPABASE_*`).
 3. В Supabase добавить прод-адрес в Site URL / Redirect URLs (`https://<домен>/auth/callback`).
 
 ## Как устроено
